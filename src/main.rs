@@ -52,6 +52,21 @@ impl<T: Hash + Eq + Copy> FrequencyTable<T> {
     }
 }
 
+#[cfg(test)]
+mod test {
+    use super::FrequencyTable;
+    use rand;
+    #[test]
+    fn singleton() {
+        let mut rng = rand::weak_rng();
+        let mut table = FrequencyTable::new();
+        table.observe('a');
+        let result = table.rand(&mut rng);
+        assert_eq!(result, 'a');
+
+    }
+}
+
 #[derive(Debug)]
 struct Data {
     existing_outputs: HashSet<String>,

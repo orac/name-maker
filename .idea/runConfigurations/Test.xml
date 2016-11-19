@@ -1,7 +1,7 @@
 <component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="Run" type="CargoCommandRunConfiguration" factoryName="Cargo Command" show_console_on_std_err="false" show_console_on_std_out="false">
+  <configuration default="false" name="Test" type="CargoCommandRunConfiguration" factoryName="Cargo Command" show_console_on_std_err="false" show_console_on_std_out="false">
     <option name="additionalArguments" value="" />
-    <option name="command" value="run" />
+    <option name="command" value="test" />
     <option name="environmentVariables">
       <map />
     </option>
