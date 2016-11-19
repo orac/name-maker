@@ -5,3 +5,4 @@ authors = ["Dan Hulme <dan.hulme@cambridgeconsultants.com>"]
 
 [dependencies]
 rand="0.3.0"
+clap = "2.18.0"

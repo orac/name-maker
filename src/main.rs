@@ -1,5 +1,6 @@
-#![allow(non_upper_case_globals)]
 extern crate rand;
+#[macro_use]
+extern crate clap;
 
 use std::io;
 use std::io::prelude::*;
@@ -10,8 +11,6 @@ use std::collections::hash_set::HashSet;
 use std::collections::hash_map::HashMap;
 use rand::Rng;
 use rand::distributions::Sample;
-
-const context_length: usize = 2;
 
 #[derive(Debug)]
 struct FrequencyTable<T: Hash + Eq + Copy> {
@@ -69,16 +68,26 @@ mod test_frequency_table {
 
 #[derive(Debug)]
 struct Data {
+    context_length: usize,
     existing_outputs: HashSet<String>,
-    contexts: HashMap<[char;context_length], FrequencyTable<char>>,
+    contexts: HashMap<String, FrequencyTable<char>>,
 }
 
 impl Data {
-    fn new() -> Data {
+    fn new(context_length: usize) -> Data {
         Data {
+            context_length: context_length,
             existing_outputs: HashSet::new(),
             contexts: HashMap::new()
         }
+    }
+
+    fn initial_context(&self) -> String {
+        let mut result = String::with_capacity(self.context_length);
+        for _ in 0..self.context_length {
+            result.push('^')
+        }
+        result
     }
 
     fn observe(&mut self, name: String) {
@@ -86,16 +95,14 @@ impl Data {
         if self.existing_outputs.contains(&name) {
             return
         }
-        let mut my_context = ['^'; context_length];
+        let mut my_context = self.initial_context();
         for character in name.chars() {
-            let mut frequencies = self.contexts.entry(my_context).or_insert_with(FrequencyTable::new);
+            let mut frequencies = self.contexts.entry(my_context.clone()).or_insert_with(FrequencyTable::new);
             frequencies.observe(character);
 
             // now update the context for next time
-            for i in 0..context_length - 1 {
-                my_context[i] = my_context[i + 1]
-            }
-            my_context[context_length - 1] = character;
+            my_context = my_context.chars().skip(1).collect();
+            my_context.push(character);
         }
         let mut frequencies = self.contexts.entry(my_context).or_insert_with(FrequencyTable::new);
         frequencies.observe('$');
@@ -105,26 +112,25 @@ impl Data {
 
 #[cfg(test)]
 mod test_data {
-    use super::context_length;
     use super::Data;
 
     #[test]
     fn singleton_title_case() {
-        let mut data = Data::new();
+        let context_length = 2;
+        let mut data = Data::new(context_length);
         data.observe(String::from("Dan"));
         assert!(data.existing_outputs.contains(&String::from("DAN")));
         assert!(data.existing_outputs.len() == 1);
-        let start_context = ['^'; context_length];
+        let start_context = data.initial_context();
         let start_table = data.contexts.get(&start_context).unwrap();
         assert_eq!(start_table.population, 1);
-
     }
 }
 
-fn read_census() -> Result<Data, io::Error> {
+fn read_census(context_length: usize) -> Result<Data, io::Error> {
     let name_file = try!(File::open("census-derived-all-first.txt"));
     let name_file = io::BufReader::new(name_file);
-    let mut result = Data::new();
+    let mut result = Data::new(context_length);
     for line in name_file.lines() {
         let line = try!(line);
         let name = String::from(line.split_whitespace().next().unwrap());
@@ -135,30 +141,34 @@ fn read_census() -> Result<Data, io::Error> {
 
 fn generate_name(data: &Data) -> String {
     let mut rng = rand::weak_rng();
-    let mut my_context = ['^'; context_length];
+    let mut my_context = data.initial_context();
     let mut result = String::new();
+    let mut first = true;
     loop {
         let next = data.contexts.get(&my_context).unwrap().rand(&mut rng);
         if next == '$' {
             break
         }
-        // if this is the first character
-        if my_context[context_length - 1] == '^' {
+        if first {
             result.extend(next.to_uppercase());
+            first = false
         } else {
             result.extend(next.to_lowercase());
         }
         // now update the context for next time
-        for i in 0..context_length - 1 {
-            my_context[i] = my_context[i + 1]
-        }
-        my_context[context_length - 1] = next;
+        my_context = my_context.chars().skip(1).collect();
+        my_context.push(next);
     }
     result
 }
 
 fn main() {
-    let data = read_census().expect("Couldn't read name list");
+    let matches = clap_app!(myapp =>
+        (about: "Generate plausible-sounding names")
+        (@arg context_length: -c --contextlength +takes_value "Sets the length of context to use")
+    ).get_matches();
+    let context_length = value_t!(matches.value_of("context_length"), usize).unwrap_or(2);
+    let data = read_census(context_length).expect("Couldn't read name list");
     loop {
         let generated = generate_name(&data);
         let upper = generated.to_uppercase();
