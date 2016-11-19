@@ -53,9 +53,10 @@ impl<T: Hash + Eq + Copy> FrequencyTable<T> {
 }
 
 #[cfg(test)]
-mod test {
+mod test_frequency_table {
     use super::FrequencyTable;
     use rand;
+
     #[test]
     fn singleton() {
         let mut rng = rand::weak_rng();
@@ -63,7 +64,6 @@ mod test {
         table.observe('a');
         let result = table.rand(&mut rng);
         assert_eq!(result, 'a');
-
     }
 }
 
@@ -80,19 +80,15 @@ impl Data {
             contexts: HashMap::new()
         }
     }
-}
 
-fn read_census() -> Result<Data, io::Error> {
-    let name_file = try!(File::open("census-derived-all-first.txt"));
-    let name_file = io::BufReader::new(name_file);
-    let mut result = Data::new();
-    for line in name_file.lines() {
+    fn observe(&mut self, name: String) {
+        let name = name.to_uppercase();
+        if self.existing_outputs.contains(&name) {
+            return
+        }
         let mut my_context = ['^'; context_length];
-        let line = try!(line);
-        let name = String::from(line.split_whitespace().next().unwrap());
-
         for character in name.chars() {
-            let mut frequencies = result.contexts.entry(my_context).or_insert_with(FrequencyTable::new);
+            let mut frequencies = self.contexts.entry(my_context).or_insert_with(FrequencyTable::new);
             frequencies.observe(character);
 
             // now update the context for next time
@@ -101,9 +97,38 @@ fn read_census() -> Result<Data, io::Error> {
             }
             my_context[context_length - 1] = character;
         }
-        let mut frequencies = result.contexts.entry(my_context).or_insert_with(FrequencyTable::new);
+        let mut frequencies = self.contexts.entry(my_context).or_insert_with(FrequencyTable::new);
         frequencies.observe('$');
-        result.existing_outputs.insert(name);
+        self.existing_outputs.insert(name);
+    }
+}
+
+#[cfg(test)]
+mod test_data {
+    use super::context_length;
+    use super::Data;
+
+    #[test]
+    fn singleton_title_case() {
+        let mut data = Data::new();
+        data.observe(String::from("Dan"));
+        assert!(data.existing_outputs.contains(&String::from("DAN")));
+        assert!(data.existing_outputs.len() == 1);
+        let start_context = ['^'; context_length];
+        let start_table = data.contexts.get(&start_context).unwrap();
+        assert_eq!(start_table.population, 1);
+
+    }
+}
+
+fn read_census() -> Result<Data, io::Error> {
+    let name_file = try!(File::open("census-derived-all-first.txt"));
+    let name_file = io::BufReader::new(name_file);
+    let mut result = Data::new();
+    for line in name_file.lines() {
+        let line = try!(line);
+        let name = String::from(line.split_whitespace().next().unwrap());
+        result.observe(name);
     }
     Ok(result)
 }
@@ -136,8 +161,9 @@ fn main() {
     let data = read_census().expect("Couldn't read name list");
     loop {
         let generated = generate_name(&data);
-        if !data.existing_outputs.contains(&generated) {
-            println!("{}", generate_name(&data));
+        let upper = generated.to_uppercase();
+        if !data.existing_outputs.contains(&upper) {
+            println!("{}", generated);
             break
         }
     }
