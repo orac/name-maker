@@ -71,8 +71,8 @@ fn read_census() -> Result<Data, io::Error> {
     let name_file = try!(File::open("census-derived-all-first.txt"));
     let name_file = io::BufReader::new(name_file);
     let mut result = Data::new();
-    let mut my_context = ['^'; context_length];
     for line in name_file.lines() {
+        let mut my_context = ['^'; context_length];
         let line = try!(line);
         let name = String::from(line.split_whitespace().next().unwrap());
 
@@ -94,7 +94,7 @@ fn read_census() -> Result<Data, io::Error> {
 }
 
 fn generate_name(data: &Data) -> String {
-    let mut rng = rand::thread_rng();
+    let mut rng = rand::weak_rng();
     let mut my_context = ['^'; context_length];
     let mut result = String::new();
     loop {
