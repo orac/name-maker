@@ -1,3 +1,4 @@
+#![allow(non_upper_case_globals)]
 extern crate rand;
 
 use std::io;
@@ -13,18 +14,18 @@ use rand::distributions::Sample;
 const context_length: usize = 2;
 
 #[derive(Debug)]
-struct FrequencyTable<T: Hash + Eq> {
+struct FrequencyTable<T: Hash + Eq + Copy> {
     observations: HashMap<T, u32>,
     population: u32
 }
 
-impl<T: Hash + Eq> Sample<T> for FrequencyTable<T> {
+impl<T: Hash + Eq + Copy> Sample<T> for FrequencyTable<T> {
     fn sample<R: Rng>(&mut self, rng: &mut R) -> T {
         self.rand(rng)
     }
 }
 
-impl<T: Hash + Eq> FrequencyTable<T> {
+impl<T: Hash + Eq + Copy> FrequencyTable<T> {
     fn new() -> FrequencyTable<T> {
         FrequencyTable {
             observations: HashMap::new(),
@@ -38,15 +39,16 @@ impl<T: Hash + Eq> FrequencyTable<T> {
         self.population += 1;
     }
 
-    fn rand(&self, &mut rng: Rng) {
-        let mut index = rng.gen_range(0, population);
+    fn rand<R: Rng>(&self, rng: &mut R) -> T {
+        let mut index = rng.gen_range(0, self.population);
         for (key, freq) in self.observations.iter() {
-            if index < freq {
-                return key
+            if index < *freq {
+                return *key
             } else {
-                index -= key
+                index -= *freq
             }
         }
+        panic!()
     }
 }
 
@@ -94,8 +96,28 @@ fn read_census() -> Result<Data, io::Error> {
 fn generate_name(data: Data) -> String {
     let mut rng = rand::thread_rng();
     let mut my_context = ['^'; context_length];
+    let mut result = String::new();
+    loop {
+        let next = data.contexts.get(&my_context).unwrap().rand(&mut rng);
+        if next == '$' {
+            break
+        }
+        // if this is the first character
+        if my_context[context_length - 1] == '^' {
+            result.extend(next.to_uppercase());
+        } else {
+            result.extend(next.to_lowercase());
+        }
+        // now update the context for next time
+        for i in 0..context_length - 1 {
+            my_context[i] = my_context[i + 1]
+        }
+        my_context[context_length - 1] = next;
+    }
+    result
 }
 
 fn main() {
     let data = read_census().expect("Couldn't read name list");
+    println!("{}", generate_name(data))
 }
