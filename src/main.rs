@@ -93,7 +93,7 @@ fn read_census() -> Result<Data, io::Error> {
     Ok(result)
 }
 
-fn generate_name(data: Data) -> String {
+fn generate_name(data: &Data) -> String {
     let mut rng = rand::thread_rng();
     let mut my_context = ['^'; context_length];
     let mut result = String::new();
@@ -119,5 +119,11 @@ fn generate_name(data: Data) -> String {
 
 fn main() {
     let data = read_census().expect("Couldn't read name list");
-    println!("{}", generate_name(data))
+    loop {
+        let generated = generate_name(&data);
+        if !data.existing_outputs.contains(&generated) {
+            println!("{}", generate_name(&data));
+            break
+        }
+    }
 }
